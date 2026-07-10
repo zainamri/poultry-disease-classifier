@@ -45,9 +45,9 @@ def apply_clahe(rgb_img, clip_limit=2.0, tile_grid_size=(8, 8)):
 
 def preprocess_image(image, target_size=(224, 224), use_clahe=True):
     """
-    Menjalankan seluruh pipeline preprocessing yang PERSIS IDENTIK dengan training:
-    1. Resize ke ukuran target (224x224)
-    2. Terapkan CLAHE pada ruang warna LAB (kanal L)
+    Menjalankan seluruh pipeline preprocessing yang PERSIS IDENTIK 100% dengan ChickenGenerator._load saat training:
+    1. Terapkan CLAHE pada citra resolusi penuh RGB melalui ruang warna LAB (kanal L)
+    2. Resize ke ukuran target (224x224) menggunakan interpolasi INTER_LINEAR
     3. Normalisasi menggunakan tf.keras.applications.efficientnet.preprocess_input()
     
     Parameter:
@@ -66,22 +66,20 @@ def preprocess_image(image, target_size=(224, 224), use_clahe=True):
     else:
         img_rgb = np.array(image)
         
-    # 1. Resize ke 224x224 (menggunakan interpolasi standar)
-    img_resized = cv2.resize(img_rgb, target_size, interpolation=cv2.INTER_AREA)
+    # Simpan preview citra asli setelah resize
+    preview_original = cv2.resize(img_rgb, target_size, interpolation=cv2.INTER_LINEAR)
     
-    # Simpan preview citra asli (tanpa CLAHE)
-    preview_original = img_resized.copy()
-    
-    # 2. Terapkan CLAHE jika diminta
+    # 1. Terapkan CLAHE TERLEBIH DAHULU pada resolusi penuh (sama persis dengan _load di training generator)
     if use_clahe:
-        img_clahe = apply_clahe(img_resized)
+        img_clahe_full = apply_clahe(img_rgb)
     else:
-        img_clahe = img_resized.copy()
+        img_clahe_full = img_rgb.copy()
         
-    preview_clahe = img_clahe.copy()
+    # 2. Resize ke 224x224 setelah CLAHE menggunakan INTER_LINEAR (bawaan cv2.resize di _load)
+    preview_clahe = cv2.resize(img_clahe_full, target_size, interpolation=cv2.INTER_LINEAR)
     
     # 3. Normalisasi dengan preprocess_input EfficientNet
-    img_float = img_clahe.astype(np.float32)
+    img_float = preview_clahe.astype(np.float32)
     img_normalized = eff_preprocess_input(img_float)
     
     # Tambahkan dimensi batch (1, 224, 224, 3)
